@@ -1,0 +1,247 @@
+---
+title: "ASSIGNMENT"
+author: "Pham Hong Thao Nguyen - 22218191"
+date: "`r Sys.Date()`"
+fontsize: 12pt
+line-height: 1.5
+output:
+  pdf_document: default
+  html_document: default
+  toc_depth: 2
+---
+
+By including this statement, we the authors of this work, verify that:
+
+- We hold a copy of this assignment that we can produce if the original is lost or damaged.
+
+- We hereby certify that no part of this assignment/product has been copied from any other student’s work or from any other source except where due acknowledgement is made in the assignment.
+
+- No part of this assignment/product has been written/produced for us by another person except where such collaboration has been authorised by the subject lecturer/tutor concerned.
+
+- We are aware that this work may be reproduced and submitted to plagiarism detection software programs for the purpose of detecting possible plagiarism (which may retain a copy on its database for future plagiarism checking).
+
+- We hereby certify that we have read and understand what the School of Computing, Engineering and Mathematics defines as minor and substantial breaches of misconduct as outlined in the learning guide for this unit.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/LENOVO/OneDrive/Documents/AP/A3")
+```
+
+\newpage
+
+## TASK 1
+### 1. Load libraries, data
+```{r}
+library(tidyverse)
+Engine_before <- read_csv("Engine.csv",show_col_types = FALSE)
+Automobile_before <- read_csv("Automobile.csv",show_col_types = FALSE)
+Maintenance_before <- read_csv("Maintenance.csv",show_col_types = FALSE)
+```
+After importing use str to understand the data sets structure and data type
+```{r}
+str(Engine_before)
+str(Automobile_before)
+str(Maintenance_before)
+```
+
+### 2. Replace all "?" entries with NA
+```{r}
+#merger data set for quicker replacement
+df <- list(Engine_before,Automobile_before,Maintenance_before) 
+
+df <- lapply(df,function(df){
+  df[df == "?"] <- NA #in df extract all the ? and replace it with NA
+  return(df)
+})
+
+#Reassign each dataset
+Engine <- df[[1]]
+Automobile <- df[[2]]
+Maintenance <- df[[3]]
+```
+
+### 3. Count number of affected rows after replacement
+```{r}
+#creating a function to count how many NA in the data sets
+count <- function(df) {
+  sum(is.na(df))
+}
+count_NA <- sapply(df, count)
+count_NA
+```
+Output show total NA values in each data set
+Based on the output: Engine has 6 rows, Automobile have 0, Maintenance has 28 rows
+
+### 4. Check distribution change after imputation
+The mean shows whether the overall average changed after replacement, while the median shows whether the central position of the distribution changed. Using both ensures that the replacement of missing values did not distort the shape of the distribution.
+```{r}
+# Convert horsepower to numeric
+Horsepower_before <- as.numeric(Engine_before$Horsepower)
+Horsepower_after  <- as.numeric(Engine$Horsepower)
+# Compute descriptive statistics
+mean_before  <- mean(Horsepower_before, na.rm = TRUE)
+mean_after   <- mean(Horsepower_after, na.rm = TRUE)
+
+median_before <- median(Horsepower_before, na.rm = TRUE)
+median_after  <- median(Horsepower_after, na.rm = TRUE)
+
+# Display comparison
+data.frame(
+  Statistic = c("Mean", "Median"),
+  Before_Replacement = c(mean_before, median_before),
+  After_Replacement = c(mean_after, median_after))
+```
+There are no differences between before and after replacement so the change of ? do not effect data distribution
+
+### 5. Convert categorical variables to factor type
+
+```{r}
+Automobile$BodyStyles <- as.factor(Automobile$BodyStyles)
+Engine$FuelTypes <- as.factor(Engine$FuelTypes)
+Maintenance$ErrorCodes <- as.factor(Maintenance$ErrorCodes)
+# Use string to check the changes
+str(Automobile$BodyStyles)
+str(Engine$FuelTypes)
+str(Maintenance$ErrorCodes)
+```
+
+### 6. Handle missing Horsepower using median imputation
+```{r}
+# Calculate the median
+median_hp <- median(as.numeric(Engine$Horsepower), na.rm = TRUE) 
+# Replace NA Horsepower values
+Engine$Horsepower[is.na(Engine$Horsepower)] <- median_hp
+# View to check
+view(Engine)
+```
+
+### 7. Plot Horsepower distribution
+```{r}
+#Horsepower distribution plot
+Engine$Horsepower <- as.numeric(Engine$Horsepower) 
+
+ggplot(Engine, aes(x = Horsepower)) +
+  geom_histogram(fill = "steelblue", color = "black") +
+  labs(title = "Horsepower Distribution", x = "Horsepower", y = "Count")
+```
+
+## TASK 2
+### 1. Distribution of Horsepower across Engine Types
+```{r}
+#Creating separate histograms for each engine type by using gglot. The bin width is set to 10 for better visibility. An alpha value of 0.6 for each engine type will overlap but be semi-transparent to see the horsepower distribution of each type. The position is set to "identity" to ensure no stacking
+Engine <- Engine[rowSums(is.na(Engine)) == 0, ] #eliminate NA 
+ggplot(Engine, aes(x = Horsepower, fill = EngineType)) +
+  geom_histogram(binwidth = 10, alpha = 0.6, position = "identity") +
+  labs(title = "Distribution of Horsepower Across Engine Types",
+       x = "Horsepower",
+       y = "Count") +
+  theme_minimal()
+```
+
+The histogram compare horsepower outputs across different categories. OHC engines dominate the data set, with majoring of them recording horsepower value between 50 and 120 horsepower. This suggest OHC is a mass market offering, likely due to its ability to integrate modern technology. In contrast, DOHCV engines are the less popular and reach the highest level of horsepower, indicating configuration is likely to use in the performance-oriented vehicle line. Overall, the distribution shows that the car companies focus on the mid-power car design.      
+
+### 2. Distribution of Horsepower across Engine Size
+```{r}
+#Using mutate to modify available the EngineSize column. First case_when assigns categories as a string base on the numeric range.
+Engine <- Engine %>%
+  mutate(EngineSize = case_when(
+    EngineSize >= 60  & EngineSize <= 90 ~ "60–90",
+    EngineSize >= 91  & EngineSize <= 190 ~ "91–190",
+    EngineSize >= 191 & EngineSize <= 299 ~ "191–299",
+    EngineSize >= 300 ~ "300+",
+    TRUE ~ NA_character_))  
+# Then use factor to make these new strings factor for plotting. 
+Engine$EngineSize <- factor(Engine$EngineSize,
+                            levels = c("60–90","91–190","191–299","300+"))
+
+#Creating separate histograms for each engine type by using gglot. The bin width is set to 10 for better visibility. An alpha value of 0.6 for each engine type will overlap but be semi-transparent to see the horsepower distribution of each type. The position is set to "identity" to ensure no stacking
+ggplot(Engine, aes(x = Horsepower, fill = EngineSize)) +
+  geom_histogram(binwidth = 10, alpha = 0.6, position = "identity") +
+  labs(title = "Horsepower Distribution by Engine Size",
+       x = "Horsepower",
+       y = "Count",
+       fill = "Engine Size") +
+  theme_minimal()
+```
+
+The second histogram shows horsepower outputs across different engine sizes. 91-190 size group spans the widest horsepower range. This suggests that mid-size engines are primarily focused on due to their flexibility, as they can have both moderate performance and economical driving.     
+
+## TASK 3
+### 1. Compare CityMpg between gas and disel car
+```{r}
+#Create a column of Fuel types in the Automobile
+Automobile <- Automobile %>% left_join(
+  Engine %>% select(EngineModel, FuelTypes), by = "EngineModel",relationship = "many-to-many")
+View(Automobile)
+# Ensure CityMpg and FuelType are correct form 
+Automobile$CityMpg <- as.numeric(Automobile$CityMpg)
+Automobile$FuelTypes <- as.factor(Automobile$FuelTypes)
+# t-test
+t_test_result <- t.test(CityMpg ~ FuelTypes, data = Automobile)
+t_test_result
+```
+By the t-test result, the average CityMpg of diesel car are higher than gas cars, which is 31,47 compare to 24,32. This indicate that diesel engines are more fuel-efficient than gas ones. 
+
+### 2. DriveWheels affect fuel efficiency
+Using ANOVA to determine whether DriveWheels affect fuel efficiency due to there are more than two groups, we can not use a t-test. 
+```{r}
+#Using summary to have details of the ANOVA result, using aov does not show detailed results.
+summary(aov(CityMpg ~ DriveWheels, data = Automobile))
+summary(aov(HighwayMpg ~ DriveWheels, data = Automobile))
+```
+
+Based on the result of the p-value ANOVA for CityMPg and HighwayMPG, both are <2e-16, which indicates that drive wheels have a statistically significant effect on the fuel efficiency. 
+
+### 3. Top 5 Trouble engines
+#Filter out those engines in the dataset that have trouble
+```{r}
+#Filter out those engines in the data set that have trouble
+#Eliminate the engines have no problems
+Maintenance <- filter(Maintenance, ErrorCodes != "0" )
+Maintenance
+#Use table  counts at time troubles appears. Then use sort to make it in decreasing order. 
+#[]to choose top 5 only
+top_troubles <- sort(table(Maintenance$Troubles), decreasing = TRUE)[1:5]
+print(top_troubles)
+```
+
+### 4. Troubles differ between engine types
+To determine do the troubles differ between engine type, a chi-square test of independence is chosen to be performed between Troubles and Engine Type. 
+```{r}
+#Merger the EngineType to Automobile due to the common of EngineModel
+Automobile <- Automobile %>% left_join(
+  Engine %>% select(EngineModel, EngineType), by = "EngineModel",relationship = "many-to-many")
+#Merger EngineType to Maintenance due to the common of PlateNumber 
+Maintenance <- Maintenance %>% left_join(
+  Automobile %>% select(PlateNumber, EngineType), by = "PlateNumber",relationship = "many-to-many")
+#Chi-square testing
+chi_result <- chisq.test(Maintenance$Troubles,Maintenance$EngineType)$p.value
+chi_result
+```
+
+The test shows that p-value of  6.793973e-18 which is > 0.05. This result provide that troubles vary between engine types. 
+
+## TASK 4
+### 1. Most frequent error type
+```{r}
+#use table to see the frequencies of error codes
+error <- table(Maintenance$ErrorCodes) 
+print(error)
+```
+
+### 2.Factors influence the maintenance methods
+Fuel Type and Drive Wheels are selected because both variables are mechanically relevant factor that influences how vehicles experience failures and maintenance methods are required.
+Both of these factors are characteristics, making them suitable for the chi-square test. 
+```{r}
+Maintenance <- Maintenance %>% left_join(
+  Automobile %>% select(PlateNumber, DriveWheels,FuelTypes), by = "PlateNumber",relationship = "many-to-many")
+# Relationship between FuelType and MaintenanceMethod
+chisq.test(Maintenance$FuelTypes, Maintenance$Methods)
+# Relationship between DriveWheels and MaintenanceMethod
+chisq.test(Maintenance$DriveWheels, Maintenance$Methods)
+```
+
+The result of chi-square tests between fuel types and Maintenance methods returns a p-value = 0.091, showing that there is no association between fuel type and maintenance method as p-value > 0.05.In contrast, the chi-square result of drive wheels and maintenance methods returns a p-value of 1.563e-06. which is less than 0.05. It shows a strong association between drive wheels and maintenance methods.
+  
+
+
